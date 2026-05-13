@@ -132,8 +132,6 @@ jobs:
       - name: Download videos
         id: download
         run: |
-          set -euo pipefail
-          
           # ---- quality ----
           QUALITY="${{ inputs.quality }}"
           if [ "$QUALITY" = "audio" ]; then
