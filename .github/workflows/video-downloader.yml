@@ -120,7 +120,7 @@ jobs:
       - name: Setup yt-dlp
         run: |
           sudo apt-get install -y python3-pip curl
-          pip install yt-dlp --pre
+          pip install yt-dlp
 
       - name: Download videos
         id: download
