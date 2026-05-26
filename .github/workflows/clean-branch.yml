@@ -48,11 +48,17 @@ jobs:
 
           if [ "$TARGET_BRANCH" = "all" ]; then
             echo "Mode: Cleaning all remote branches except main and dev."
-            git remote update origin --prune            
-            git for-each-ref --format='%(refname:short)' refs/remotes/origin/ |\
-            sed 's/origin\///' |\
-            grep -vE '^(main|master|dev|HEAD)$' |\
-            xargs -r -n 1 git push origin --delete
+            git remote update origin --prune
+            git branch -r | \
+            sed 's|origin/||' | \
+            sed 's|^[[:space:]]*||' | \
+            grep -vE '^(HEAD|main|master|dev)$' | \
+            while read -r branch; do
+              if [ -n "$branch" ]; then
+                echo "Deleting branch: $branch"
+                git push origin --delete "$branch"
+              fi
+            done
           else
             echo "Mode: Cleaning single branch: $TARGET_BRANCH"
             if git ls-remote --exit-code --heads origin "$TARGET_BRANCH" > /dev/null 2>&1; then
