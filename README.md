@@ -61,9 +61,7 @@ Unzip the downloaded file and open the `archive` folder inside it. You can eithe
 - (For non-experts) View the generated screenshot
 
 #### 🎤 How do I delete the downloaded files from the repository?
-Click on this button in your repo's main page to access the list of branches:  
-[Main repo page circling the branches page button](https://abrehamrahi.ir/o/public/8tQTYpkc/).  
-Then delete the branches you no longer need.
+Use the "Clean Branch" workflow.
 
 #### 🎤 How do I use multiple workflows simultaneously?
 For simultaneous workflows of the same type (e.g. if both are Video), you can use the Branch Name option to use two different branches.   
