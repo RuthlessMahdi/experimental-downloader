@@ -16,7 +16,7 @@ on:
         default: 'videos'
 
 jobs:
-  download-and-release:
+  clean-branches:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -42,19 +42,21 @@ jobs:
 
           if [ -z "$TARGET_BRANCH" ]; then
             echo "Branch name is empty"
-            exit 1
+            exit 0
           fi
 
           git fetch origin
 
           if [ "$TARGET_BRANCH" = "all" ]; then
-            echo "Mode: Cleaning all remote branches except the main and dev."
-            git remote update origin --prune
+            echo "Mode: Cleaning all remote branches except main and dev."
+            git remote update origin --prune            
             git for-each-ref --format='%(refname:short)' refs/remotes/origin/ |\
             sed 's/origin\///' |\
-            grep -vE '^(main|dev)$' |\
+            grep -vE '^(main|master|dev|HEAD)$' |\
             xargs -r -n 1 git push origin --delete
           else
             echo "Mode: Cleaning single branch: $TARGET_BRANCH"
-            git push origin --delete "$TARGET_BRANCH"
+            if git ls-remote --exit-code --heads origin "$TARGET_BRANCH" > /dev/null; then
+              git push origin --delete "$TARGET_BRANCH"
+            fi
           fi
