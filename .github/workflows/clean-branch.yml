@@ -10,10 +10,9 @@ on:
         type: choice
         options: [all, bash, videos, websites, wget, magnets, custom]
       custom_name:
-        description: '🔎 Custom branch name'
+        description: '🔎 Custom branch name (only used if "custom" selected)'
         required: false
         type: string
-        default: 'videos'
 
 jobs:
   clean-branches:
@@ -56,7 +55,7 @@ jobs:
             xargs -r -n 1 git push origin --delete
           else
             echo "Mode: Cleaning single branch: $TARGET_BRANCH"
-            if git ls-remote --exit-code --heads origin "$TARGET_BRANCH" > /dev/null; then
+            if git ls-remote --exit-code --heads origin "$TARGET_BRANCH" > /dev/null 2>&1; then
               git push origin --delete "$TARGET_BRANCH"
             fi
           fi
