@@ -161,6 +161,6 @@ jobs:
           
       - name: Commit
         run: |
-          git add README.md music
+          git add README.md musics
           git commit -m "[bot] Add music ${{ env.SAFE_NAME }}"
           git push
