@@ -122,26 +122,27 @@ jobs:
       - name: Download music
         id: download
         run: |
-          # output formatting
-          OUTPUT_NAME="${{ inputs.output_name }}"
+          # Use an array to safely handle arguments with spaces
+          OUTPUT_OPTS=()
+          OUTPUT_NAME="${{ inputs.inputs.output_name }}"
+          
           if [ -n "$OUTPUT_NAME" ]; then
-              OUTPUT_OPTS="--output ${OUTPUT_NAME}/{artist} - {title}.{output-ext}"
+              OUTPUT_OPTS+=("--output" "${OUTPUT_NAME}/{artist} - {title}.{output-ext}")
           else
-              OUTPUT_OPTS="--output {artist} - {title}.{output-ext}"
+              OUTPUT_OPTS+=("--output" "{artist} - {title}.{output-ext}")
           fi
           
-          # proxy config
-          PROXY_OPTS=""
+          # Handle proxy explicitly via spotdl's argument flag
           if [ "${{ inputs.use_warp }}" = "true" ]; then
-              export ALL_PROXY="socks5h://127.0.0.1:1080"
-              # explicitly pass to yt-dlp under the hood if needed, but ALL_PROXY usually covers it
+              OUTPUT_OPTS+=("--proxy" "socks5://127.0.0.1:1080")
           fi
           
           # download
           mkdir -p tmpmusic
           cd tmpmusic
           
-          spotdl "${{ inputs.url }}" --format ${{ inputs.format }} $OUTPUT_OPTS
+          # Expanding the array with "${OUTPUT_OPTS[@]}" safely preserves spaces
+          spotdl "${{ inputs.url }}" --format ${{ inputs.format }} "${OUTPUT_OPTS[@]}"
           
           # find safe name for the zip file
           if [ -n "$OUTPUT_NAME" ]; then
