@@ -1,5 +1,5 @@
 # Experimental Downloader 
-**A collection of GitHub Actions workflows for downloading videos, websites, direct files, torrents, and custom Bash outputs directly inside your own fork.**
+**A collection of GitHub Actions workflows for downloading videos, websites, direct files, torrents, musics and custom Bash outputs directly inside your own fork.**
 
 ## 🚀 Getting Started
 1. Fork this repository
@@ -18,6 +18,13 @@ ___
 2. Run the "Video Downloader" Workflow in the Actions tab (ensure link is filled)
 3. Await completion (Some videos will fail)
 4. Switch to the `videos` branch
+5. View download links
+
+### 🎵 Music (Spotify)
+1. Fork the main branch
+2. Run the "Music Downloader" Workflow in the Actions tab (ensure link is filled)
+3. Await completion (Some songs will fail)
+4. Switch to the `music` branch
 5. View download links
 
 ### 🌐 Website (ファミ通, X, etc.)
