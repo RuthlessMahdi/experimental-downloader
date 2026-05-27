@@ -118,6 +118,7 @@ jobs:
         run: |
           sudo apt-get install -y python3-pip curl zip
           pip install spotdl yt-dlp
+          spotdl --download-deno
 
       - name: Download music
         id: download
