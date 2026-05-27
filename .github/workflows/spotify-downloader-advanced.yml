@@ -1,10 +1,10 @@
-name: Spotify Downloader
+name: Spotify Downloader (Advanced)
 
 on:
   workflow_dispatch:
     inputs:
       url:
-        description: '🔗 Spotify Track/Playlist/Album URL'
+        description: '🔗 Spotify URL (Track, Album, or Playlist)'
         required: true
         type: string
       format:
@@ -12,9 +12,19 @@ on:
         required: true
         default: 'mp3'
         type: choice
-        options: [mp3, m4a, flac, wav, opus]
-      output_pattern:
-        description: '📝 Custom output template (optional, e.g., "{artist} - {title}")'
+        options: [mp3, flac, m4a, opus, ogg, wav]
+      use_warp:
+        description: '🛡️ Use WARP (sometimes helps | +40s)'
+        required: true
+        default: true
+        type: boolean
+      parts_size:
+        description: '🫙 Parts size (MB)'
+        required: false
+        type: string
+        default: '45'
+      output_name:
+        description: '📝 Output folder/file name (optional)'
         required: false
         type: string
       branch_name:
@@ -62,10 +72,13 @@ jobs:
           ffmpeg -version
 
       - name: Setup WARP
+        if: ${{ inputs.use_warp }}
         run: |
+          # clean up any existing container/network (useful for self-hosted runners)
           docker rm -f warp 2>/dev/null || true
           docker network create warp-net 2>/dev/null || true
 
+          # start WARP 
           docker run -d \
             --name warp \
             --restart=always \
@@ -79,13 +92,15 @@ jobs:
 
           echo "Waiting for WARP to initialize..."
 
+          # dynamic polling loop (up to 30 seconds max)
           WARP_READY=false
           for i in {1..10}; do
+            # use 1.1.1.1 for faster trace resolution
             RESULT=$(curl -s --max-time 3 --socks5-hostname 127.0.0.1:1080 https://cloudflare.com/cdn-cgi/trace 2>/dev/null || true)
             
             if echo "$RESULT" | grep -qE "warp=(on|plus)"; then
               echo "WARP proxy is ready! (Took $i attempts)"
-              echo "$RESULT" | grep -E "^(ip|warp|colo)="
+              echo "$RESULT" | grep -E "^(ip|warp|colo)=" # Print clean debug info
               WARP_READY=true
               break
             fi
@@ -101,58 +116,52 @@ jobs:
 
       - name: Setup spotDL
         run: |
-          sudo apt-get install -y python3-pip python3-venv curl python3-setuptools
-          python3 -m venv venv
-          source venv/bin/activate
-          pip install --upgrade pip
-          # Add pysocks to allow Python to natively understand socks5:// URIs
-          pip install spotdl pysocks
-          spotdl --version
+          sudo apt-get install -y python3-pip curl zip
+          pip install spotdl yt-dlp
 
       - name: Download music
         id: download
         run: |
-          source venv/bin/activate
-          
-          # Output pattern config
-          OUTPUT_PATTERN="${{ inputs.output_pattern }}"
-          if [ -n "$OUTPUT_PATTERN" ]; then
-              OUTPUT_OPTS="--format ${{ inputs.format }} --output ${OUTPUT_PATTERN}.{output-ext}"
+          # output formatting
+          OUTPUT_NAME="${{ inputs.output_name }}"
+          if [ -n "$OUTPUT_NAME" ]; then
+              OUTPUT_OPTS="--output ${OUTPUT_NAME}/{artist} - {title}.{output-ext}"
           else
-              OUTPUT_OPTS="--format ${{ inputs.format }}"
+              OUTPUT_OPTS="--output {artist} - {title}.{output-ext}"
           fi
           
+          # proxy config
+          PROXY_OPTS=""
+          if [ "${{ inputs.use_warp }}" = "true" ]; then
+              export ALL_PROXY="socks5h://127.0.0.1:1080"
+              # explicitly pass to yt-dlp under the hood if needed, but ALL_PROXY usually covers it
+          fi
+          
+          # download
           mkdir -p tmpmusic
           cd tmpmusic
           
-          # Force the underlying networking libraries to route everything through WARP
-          export ALL_PROXY="socks5://127.0.0.1:1080"
-          export all_proxy="socks5://127.0.0.1:1080"
+          spotdl "${{ inputs.url }}" --format ${{ inputs.format }} $OUTPUT_OPTS
           
-          # Run spotdl cleanly without the broken --proxy flag
-          spotdl download "${{ inputs.url }}" $OUTPUT_OPTS
-
-          # Fallback check if it's a playlist/multi-track item
-          FILE=$(ls -1 | head -n 1)
-          if [ -z "$FILE" ]; then
-            echo "Error: No files downloaded."
-            exit 1
+          # find safe name for the zip file
+          if [ -n "$OUTPUT_NAME" ]; then
+              SAFE_NAME=$(echo "$OUTPUT_NAME" | sed 's/^[[:space:]]*//' | tr ' ' '_')
+          else
+              FILE=$(ls -1 | head -n 1)
+              FILE_NO_EXTENSION="${FILE%.*}"
+              SAFE_NAME=$(echo "$FILE_NO_EXTENSION" | sed 's/^[[:space:]]*//' | tr ' ' '_')
           fi
-          
-          FILE_NO_EXTENSION="${FILE%.*}"
-          echo "FILE=$FILE" >> $GITHUB_ENV
-          echo "FILE_NO_EXTENSION=$FILE_NO_EXTENSION" >> $GITHUB_ENV
-          SAFE_NAME=$(echo "$FILE_NO_EXTENSION" | sed 's/^[[:space:]]*//' | tr ' ' '_')
           echo "SAFE_NAME=$SAFE_NAME" >> $GITHUB_ENV
           
-          # Zip and slice
+          # zip and overwrite
           mkdir -p ../music
           rm -rf tmpzip
           mkdir tmpzip
-          zip -r -0 -s "45m" "tmpzip/${SAFE_NAME}.zip" "."
+          zip -r -0 -s "${{ inputs.parts_size }}m" "tmpzip/${SAFE_NAME}.zip" "."
           mv tmpzip/* ../music/
-
+          
       - name: Stop WARP
+        if: ${{ inputs.use_warp }}
         run: |
           docker stop warp || true
 
@@ -164,10 +173,13 @@ jobs:
           echo "Generated on: $(date)" >> README.md
           echo "" >> README.md
           
+          # loop through all files in the music folder
           for file in music/*; do
             if [ -f "$file" ]; then
               filename=$(basename "$file")
+              # URL Encode spaces for the markdown link
               encoded_filename=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$filename")
+              # Construct the raw link
               url="https://github.com/${{ github.repository }}/raw/${{ inputs.branch_name }}/music/$encoded_filename"
               echo "- [Download $filename]($url)" >> README.md
             fi
@@ -176,5 +188,5 @@ jobs:
       - name: Commit
         run: |
           git add README.md music
-          git commit -m "[bot] Add music components ${{ env.SAFE_NAME }}"
+          git commit -m "[bot] Add music ${{ env.SAFE_NAME }}"
           git push
