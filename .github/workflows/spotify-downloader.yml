@@ -127,7 +127,7 @@ jobs:
           
           # Run spotdl through the local SOCKS5 proxy managed by WARP
           # (spotDL uses yt-dlp under the hood for audio acquisition)
-          spotdl download "${{ inputs.url }}" $OUTPUT_OPTS --proxy "socks5://127.0.0.1:1080"
+          spotdl download "${{ inputs.url }}" $OUTPUT_OPTS --proxy "socks5h://127.0.0.1:1080"
 
           # Fallback check if it's a playlist/multi-track item, grab the first file found for naming metadata
           FILE=$(ls -1 | head -n 1)
