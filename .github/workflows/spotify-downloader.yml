@@ -114,7 +114,7 @@ jobs:
         run: |
           source venv/bin/activate
           
-          # output pattern config
+          # Output pattern config
           OUTPUT_PATTERN="${{ inputs.output_pattern }}"
           if [ -n "$OUTPUT_PATTERN" ]; then
               OUTPUT_OPTS="--format ${{ inputs.format }} --output ${OUTPUT_PATTERN}.{output-ext}"
@@ -125,11 +125,14 @@ jobs:
           mkdir -p tmpmusic
           cd tmpmusic
           
-          # Run spotdl through the local SOCKS5 proxy managed by WARP
-          # (spotDL uses yt-dlp under the hood for audio acquisition)
-          spotdl download "${{ inputs.url }}" $OUTPUT_OPTS --proxy "socks5h://127.0.0.1:1080"
+          # Force the underlying networking libraries to route everything through WARP
+          export ALL_PROXY="socks5://127.0.0.1:1080"
+          export all_proxy="socks5://127.0.0.1:1080"
+          
+          # Run spotdl cleanly without the broken --proxy flag
+          spotdl download "${{ inputs.url }}" $OUTPUT_OPTS
 
-          # Fallback check if it's a playlist/multi-track item, grab the first file found for naming metadata
+          # Fallback check if it's a playlist/multi-track item
           FILE=$(ls -1 | head -n 1)
           if [ -z "$FILE" ]; then
             echo "Error: No files downloaded."
@@ -142,13 +145,13 @@ jobs:
           SAFE_NAME=$(echo "$FILE_NO_EXTENSION" | sed 's/^[[:space:]]*//' | tr ' ' '_')
           echo "SAFE_NAME=$SAFE_NAME" >> $GITHUB_ENV
           
-          # zip and slice if it exceeds thresholds, just like the original pipeline structure
+          # Zip and slice
           mkdir -p ../music
           rm -rf tmpzip
           mkdir tmpzip
           zip -r -0 -s "45m" "tmpzip/${SAFE_NAME}.zip" "."
           mv tmpzip/* ../music/
-          
+
       - name: Stop WARP
         run: |
           docker stop warp || true
