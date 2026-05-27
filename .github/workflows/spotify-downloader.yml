@@ -105,7 +105,8 @@ jobs:
           python3 -m venv venv
           source venv/bin/activate
           pip install --upgrade pip
-          pip install spotdl
+          # Add pysocks to allow Python to natively understand socks5:// URIs
+          pip install spotdl pysocks
           spotdl --version
 
       - name: Download music
