@@ -117,7 +117,6 @@ jobs:
           if [ "$WARP_READY" = false ]; then
             echo "WARP failed to activate fully, continuing anyway..."
             echo "Last response: $RESULT"
-            # exit 1  <-- Uncomment this if you want the pipeline to FAIL when WARP fails
           fi
 
       - name: Setup yt-dlp

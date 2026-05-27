@@ -7,26 +7,11 @@ on:
         description: '🔗 Spotify URL (Track, Album, or Playlist)'
         required: true
         type: string
-      format:
-        description: '🎵 Audio format'
-        required: true
-        default: 'mp3'
-        type: choice
-        options: [mp3, flac, m4a, opus, ogg, wav]
       use_warp:
         description: '🛡️ Use WARP (sometimes helps | +40s)'
         required: true
         default: true
         type: boolean
-      parts_size:
-        description: '🫙 Parts size (MB)'
-        required: false
-        type: string
-        default: '45'
-      output_name:
-        description: '📝 Output folder/file name (optional)'
-        required: false
-        type: string
       branch_name:
         description: 'ℹ️ Branch name (simultaneous workflows cannot be on the same branch)'
         required: true
@@ -116,54 +101,38 @@ jobs:
 
       - name: Setup spotDL
         run: |
-          sudo apt-get install -y python3-pip curl zip
-          pip install spotdl yt-dlp
+          sudo apt-get install -y python3-pip curl
+          pip install spotdl yt-dlp --pre
           spotdl --download-deno
 
       - name: Download music
         id: download
         run: |
-          # Use an array to safely handle arguments with spaces
-          OUTPUT_OPTS=()
-          OUTPUT_NAME="${{ inputs.output_name }}"
+          # download
+          mkdir -p tmpmusic
+          cd tmpmusic
           
-          if [ -n "$OUTPUT_NAME" ]; then
-              OUTPUT_OPTS+=("--output" "${OUTPUT_NAME}/{artist} - {title}.{output-ext}")
-          else
-              OUTPUT_OPTS+=("--output" "{artist} - {title}.{output-ext}")
-          fi
-          
-          # Export proxy to env vars instead of using the CLI flag.
-          # This bypasses spotdl's strict CLI string parsing rules completely.
           if [ "${{ inputs.use_warp }}" = "true" ]; then
               export http_proxy="socks5h://127.0.0.1:1080"
               export https_proxy="socks5h://127.0.0.1:1080"
               export ALL_PROXY="socks5h://127.0.0.1:1080"
           fi
+          spotdl --dont-filter-results "${{ inputs.url }}"
           
-          # download
-          mkdir -p tmpmusic
-          cd tmpmusic
-          
-          # Running spotdl without the explicit --proxy flag
-          spotdl "${{ inputs.url }}" --format ${{ inputs.format }} "${OUTPUT_OPTS[@]}"
-          
-          # find safe name for the zip file
-          if [ -n "$OUTPUT_NAME" ]; then
-              SAFE_NAME=$(echo "$OUTPUT_NAME" | sed 's/^[[:space:]]*//' | tr ' ' '_')
-          else
-              FILE=$(ls -1 | head -n 1)
-              FILE_NO_EXTENSION="${FILE%.*}"
-              SAFE_NAME=$(echo "$FILE_NO_EXTENSION" | sed 's/^[[:space:]]*//' | tr ' ' '_')
-          fi
+          # find name
+          FILE=$(ls -1 | head -n 1)
+          FILE_NO_EXTENSION="${FILE%.*}"
+          echo "FILE=$FILE" >> $GITHUB_ENV
+          echo "FILE_NO_EXTENSION=$FILE_NO_EXTENSION" >> $GITHUB_ENV
+          SAFE_NAME=$(echo "$FILE_NO_EXTENSION" | sed 's/^[[:space:]]*//' | tr ' ' '_')
           echo "SAFE_NAME=$SAFE_NAME" >> $GITHUB_ENV
           
           # zip and overwrite
-          mkdir -p ../music
+          mkdir -p ../musics
           rm -rf tmpzip
           mkdir tmpzip
-          zip -r -0 -s "${{ inputs.parts_size }}m" "tmpzip/${SAFE_NAME}.zip" "."
-          mv tmpzip/* ../music/
+          zip -r -0 -s 45m "tmpzip/${SAFE_NAME}.zip" "."
+          mv tmpzip/* ../musics/
           
       - name: Stop WARP
         if: ${{ inputs.use_warp }}
@@ -178,14 +147,14 @@ jobs:
           echo "Generated on: $(date)" >> README.md
           echo "" >> README.md
           
-          # loop through all files in the music folder
-          for file in music/*; do
+          # loop through all files in the musics folder
+          for file in musics/*; do
             if [ -f "$file" ]; then
               filename=$(basename "$file")
               # URL Encode spaces for the markdown link
               encoded_filename=$(python3 -c "import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))" "$filename")
               # Construct the raw link
-              url="https://github.com/${{ github.repository }}/raw/${{ inputs.branch_name }}/music/$encoded_filename"
+              url="https://github.com/${{ github.repository }}/raw/${{ inputs.branch_name }}/musics/$encoded_filename"
               echo "- [Download $filename]($url)" >> README.md
             fi
           done
