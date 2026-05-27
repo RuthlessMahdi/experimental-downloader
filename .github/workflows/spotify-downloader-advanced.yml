@@ -124,7 +124,7 @@ jobs:
         run: |
           # Use an array to safely handle arguments with spaces
           OUTPUT_OPTS=()
-          OUTPUT_NAME="${{ inputs.inputs.output_name }}"
+          OUTPUT_NAME="${{ inputs.output_name }}"
           
           if [ -n "$OUTPUT_NAME" ]; then
               OUTPUT_OPTS+=("--output" "${OUTPUT_NAME}/{artist} - {title}.{output-ext}")
@@ -132,16 +132,19 @@ jobs:
               OUTPUT_OPTS+=("--output" "{artist} - {title}.{output-ext}")
           fi
           
-          # Handle proxy explicitly via spotdl's argument flag
+          # Export proxy to env vars instead of using the CLI flag.
+          # This bypasses spotdl's strict CLI string parsing rules completely.
           if [ "${{ inputs.use_warp }}" = "true" ]; then
-              OUTPUT_OPTS+=("--proxy" "socks5://127.0.0.1:1080")
+              export http_proxy="socks5h://127.0.0.1:1080"
+              export https_proxy="socks5h://127.0.0.1:1080"
+              export ALL_PROXY="socks5h://127.0.0.1:1080"
           fi
           
           # download
           mkdir -p tmpmusic
           cd tmpmusic
           
-          # Expanding the array with "${OUTPUT_OPTS[@]}" safely preserves spaces
+          # Running spotdl without the explicit --proxy flag
           spotdl "${{ inputs.url }}" --format ${{ inputs.format }} "${OUTPUT_OPTS[@]}"
           
           # find safe name for the zip file
